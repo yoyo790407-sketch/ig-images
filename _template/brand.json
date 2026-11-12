@@ -1,0 +1,14 @@
+{
+  "name": "Sunny 品牌萃取所",
+  "handle": "@sunny_lin67",
+  "caption": {"color": "#FFFFFF", "weight": 900, "size": 80, "position": "center, top 1330px", "glow": "black"},
+  "accent": {"color": "#F6C344", "font": "LXGW WenKai TC (手寫)", "use": "重點字、副標、補充字"},
+  "card": {"bg": "rgba(255,250,244,.88)", "radius": 40, "check": "#8FB39A", "strike": "#E8453C", "progress": "#F6A623"},
+  "rules": [
+    "卡片內容只能來自影片裡講的話，不編留言、不編清單、不編數字",
+    "一支影片 3～5 個效果，每個要能說出幫觀眾理解了什麼",
+    "卡片放上方避開人臉，字幕放下方",
+    "保留原音；配樂用 _template/music 裡的無版權檔，講話時自動壓低",
+    "有小孩或私事的片段，發前先問 Sunny"
+  ]
+}

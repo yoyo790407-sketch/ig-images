@@ -55,6 +55,19 @@ CSS="""<link rel=stylesheet href="lxgwwenkaitc-bold.css"><style>
 .sb .g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}.sb img{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:18px}
 .sb h4{font-size:28px;color:#888;margin-bottom:18px}
 svg{position:absolute}
+.steps{position:absolute;left:50%;transform:translateX(-50%);top:110px;display:flex;gap:18px;background:rgba(255,250,244,.9);padding:16px 26px;border-radius:50px;box-shadow:0 12px 30px rgba(0,0,0,.25)}
+.steps b{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:34px;color:#3B2F2A;background:#E6DED3}.steps b.on{background:#F6C344}
+.rec{position:absolute;left:50%;transform:translateX(-50%);top:120px;background:rgba(0,0,0,.55);color:#fff;font-size:34px;padding:12px 28px;border-radius:40px;display:flex;align-items:center;gap:14px;font-family:monospace}
+.rec i{width:22px;height:22px;border-radius:50%;background:#E8453C}
+.pipe{position:absolute;left:50%;transform:translateX(-50%);top:110px;background:rgba(255,250,244,.92);padding:22px 30px;border-radius:40px;display:flex;align-items:center;gap:26px;box-shadow:0 12px 30px rgba(0,0,0,.25)}
+.pipe .st{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:24px;color:#8C7B6B;font-weight:700}.pipe .st b{width:72px;height:72px;border-radius:22px;background:#E6DED3;display:flex;align-items:center;justify-content:center;font-size:34px}.pipe .st.on b{background:#F6C344}
+.pipe .ln{width:40px;height:6px;background:#E6DED3;border-radius:3px}.pipe .ln.on{background:#F6C344}
+.badge{position:absolute;left:50%;transform:translateX(-50%);top:120px;background:rgba(255,250,244,.95);color:#3B2F2A;font-size:32px;font-weight:700;padding:16px 34px;border-radius:40px;display:flex;align-items:center;gap:14px;box-shadow:0 12px 30px rgba(0,0,0,.25)}
+.badge i{width:40px;height:40px;border-radius:50%;background:#8FB39A;color:#fff;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:26px}
+.big{position:absolute;left:40px;right:40px;top:300px;text-align:center;font-size:120px;font-weight:900;color:#F6C344;text-shadow:0 6px 0 #3B2F2A,0 0 30px rgba(0,0,0,.5);line-height:1.2}
+.ring{position:absolute;border-radius:50%;border:8px solid #F6C344;box-shadow:0 0 30px rgba(246,195,68,.7)}
+.rules{position:absolute;left:90px;top:200px;width:720px;padding:40px 50px;border-radius:40px;background:rgba(255,250,244,.92);color:#3B2F2A;box-shadow:0 20px 50px rgba(0,0,0,.28)}
+.rules h3{font-size:30px;color:#8C7B6B;margin-bottom:18px}.rules .r{display:flex;align-items:center;gap:20px;font-size:36px;font-weight:700;margin:14px 0}.sw{width:44px;height:44px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
 </style>"""
 SPARK=lambda x,y,s=1,c="#F6C344":f'<svg width="{int(110*s)}" height="{int(150*s)}" viewBox="0 0 60 80" style="left:{x}px;top:{y}px"><path d="M30 4C33 26 38 32 56 36 38 40 33 48 30 76 27 48 22 40 4 36 22 32 27 26 30 4Z" fill="{c}"/></svg>'
 BURST=lambda x,y,s=1:f'<svg width="{int(200*s)}" height="{int(200*s)}" viewBox="0 0 100 100" style="left:{x}px;top:{y}px"><path d="M30 70 18 30M50 64 58 18M66 74 92 46" stroke="#fff" stroke-width="6" stroke-linecap="round"/></svg>'
@@ -107,6 +120,27 @@ def comp_html(kind,p,t,dur):
         return f'<div class=cmt style="transform:translateY({(1-pop)*500}px);opacity:{out}"><h4>留言</h4>{rows}</div>'
     if kind=="sparkle":  # handwritten gold text + sparkles, e.g. "isn't it amazing"
         return f'<div style="position:absolute;inset:0;opacity:{pop*out}"><div class="cap hw gold" style="top:{p.get("y",1200)}px;font-size:{p.get("size",72)}px">{p["text"]}</div>{SPARK(p.get("x1",140),p.get("y",1200)-60,.8)}{SPARK(p.get("x2",860),p.get("y",1200)+40,.6)}</div>'
+    if kind=="steps":  # 1 2 3 4 step pills, current step highlighted
+        n=p.get("n",4); cur=p["cur"]
+        return f'<div class=steps style="opacity:{pop*out}">{"".join(f"<b class={chr(34)}{"on" if i<=cur else ""}{chr(34)}>{i}</b>" for i in range(1,n+1))}</div>'
+    if kind=="rec":  # recording timer
+        tt=p.get("t0",0)+t; return f'<div class=rec style="opacity:{pop*out}"><i style="opacity:{1 if int(t*2)%2==0 else .3}"></i>00:00:{int(tt):02d}</div>'
+    if kind=="pipeline":  # 剪輯→音樂→排程→發文
+        st=p.get("stages",[("✂","剪輯"),("♪","音樂"),("◷","排程"),("➤","發文")]); cur=int(min(len(st)-1,math.floor(max(0,t-p.get("delay",0.4))/p.get("every",0.7))))
+        parts=[]
+        for i,(ic,nm) in enumerate(st):
+            parts.append(f'<div class="st {"on" if i<=cur else ""}"><b>{ic}</b>{nm}</div>')
+            if i<len(st)-1: parts.append(f'<div class="ln {"on" if i<cur else ""}"></div>')
+        return f'<div class=pipe style="{s};transform-origin:50% 0">{"".join(parts)}</div>'
+    if kind=="badge":  # ✓ 安裝完成
+        return f'<div class=badge style="{s};transform-origin:50% 0"><i>✓</i>{p["text"]}</div>'
+    if kind=="big":  # big yellow title e.g. 省下時間
+        return f'<div class=big style="{s};transform-origin:50% 50%;top:{p.get("y",300)}px">{p["text"]}</div>'
+    if kind=="ring":  # circle highlight at x,y radius r
+        r=p.get("r",160)*(1+0.08*math.sin(t*6)); return f'<div class=ring style="left:{p["x"]-r}px;top:{p["y"]-r}px;width:{2*r}px;height:{2*r}px;opacity:{pop*out}"></div>'
+    if kind=="rules":  # brand rules card
+        rows="".join(f'<div class=r>{"".join(f"<span class=sw style={chr(34)}background:{c}{chr(34)}></span>" for c in r.get("colors",[]))}<span>{r["text"]}</span></div>' for r in p["rows"])
+        return f'<div class=rules style="{s};transform-origin:0 0"><h3>{p.get("title","我的品牌規則")}</h3>{rows}</div>'
     raise ValueError(kind)
 
 async def render_overlays(plan,outdir="ov"):
@@ -179,6 +213,33 @@ def halo(video,start,dur,out="halo.mp4"):
 def splice_halo(video,halo_mp4,start,dur,out="p_halo.mp4"):
     subprocess.run(["ffmpeg","-v","error","-y","-i",video,"-i",halo_mp4,"-filter_complex",f"[1:v]setpts=PTS+{start}/TB[h];[0:v][h]overlay=0:0:eof_action=pass,format=yuv420p[v]","-map","[v]","-map","0:a","-c:v","libx264","-preset","veryfast","-crf","18","-c:a","copy",out],check=True); return out
 
+async def storyboard_preview(video,plan,out="storyboard.jpg"):
+    """分鏡預覽：每個效果元件取中間一格疊在對應畫面上，拼成一張圖，給 Sunny 審核後才 render 全部"""
+    from playwright.async_api import async_playwright
+    items=[it for it in plan if it["kind"]!="caption"]
+    tiles=[]
+    async with async_playwright() as pw:
+        b=await pw.chromium.launch(); pg=await b.new_page(viewport={"width":W,"height":H})
+        for i,it in enumerate(items):
+            dur=it["end"]-it["start"]; t=min(dur*0.6,dur-0.3)
+            frame(video,it["start"]+t,f"_sbf{i}.jpg",W)
+            caps=[c for c in plan if c["kind"]=="caption" and c["start"]<=it["start"]+t<c["end"]]
+            html="<html><head><meta charset=utf-8>"+CSS+"</head><body style='background:url(file://"+os.path.abspath(f"_sbf{i}.jpg")+") center/cover'>"+comp_html(it["kind"],it["p"],t,dur)+("".join(comp_html("caption",c["p"],t+it["start"]-c["start"],c["end"]-c["start"]) for c in caps))+"</body></html>"
+            open(FONT_DIR+"sb.html","w").write(html); await pg.goto("file://"+FONT_DIR+"sb.html"); await pg.evaluate("document.fonts.ready"); await pg.wait_for_timeout(300)
+            await pg.screenshot(path=f"_sbt{i}.png"); tiles.append((f"_sbt{i}.png",f'{i+1}. {it["kind"]} @{it["start"]}s'))
+        await b.close()
+    from PIL import ImageFont
+    tw=270; th=480; cols=min(4,len(tiles)); rows=(len(tiles)+cols-1)//cols
+    sheet=Image.new("RGB",(tw*cols,(th+40)*rows),"white"); d=ImageDraw.Draw(sheet); f=ImageFont.truetype("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",20)
+    for k,(fp,lab) in enumerate(tiles):
+        x,y=(k%cols)*tw,(k//cols)*(th+40); sheet.paste(Image.open(fp).resize((tw,th)),(x,y+40)); d.text((x+8,y+8),lab,fill="black",font=f)
+    sheet.save(out,quality=88); return out
+
+def mix_music(video,music,out="reel_music.mp4",music_db=-18,duck=True):
+    """疊無版權配樂；duck=True 時講話段自動壓低音樂"""
+    af=f"[1:a]volume={music_db}dB,aloop=loop=-1:size=2e9[m];" + ("[0:a]asplit[v1][v2];[m][v2]sidechaincompress=threshold=0.02:ratio=8:attack=50:release=400[md];[v1][md]amix=inputs=2:duration=first:dropout_transition=2[a]" if duck else "[0:a][m]amix=inputs=2:duration=first[a]")
+    subprocess.run(["ffmpeg","-v","error","-y","-i",video,"-i",music,"-filter_complex",af,"-map","0:v","-map","[a]","-c:v","copy","-c:a","aac","-b:a","160k","-shortest",out],check=True); return out
+
 def frame(video,t,out,w=270):
     subprocess.run(["ffmpeg","-v","error","-y","-ss",str(t),"-i",video,"-frames:v","1","-vf",f"scale={w}:-2",out],check=True); return out
 
@@ -188,4 +249,5 @@ if __name__=="__main__":
     elif cmd=="transcribe": transcribe(sys.argv[2])
     elif cmd=="render": asyncio.run(render_overlays(json.load(open(sys.argv[2]))))
     elif cmd=="composite": composite(sys.argv[2],json.load(open(sys.argv[3])),sys.argv[4] if len(sys.argv)>4 else "full.mp4")
+    elif cmd=="storyboard": asyncio.run(storyboard_preview(sys.argv[2],json.load(open(sys.argv[3]))))
     elif cmd=="cut": cut(sys.argv[2],json.load(open(sys.argv[3])),sys.argv[4] if len(sys.argv)>4 else "reel.mp4")
