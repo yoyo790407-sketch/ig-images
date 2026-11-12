@@ -1,0 +1,77 @@
+import asyncio, json, sys, os
+from playwright.async_api import async_playwright
+from PIL import Image
+# ── Sunny 紙感明體風：咖啡棕 / 燕麥紙 / 焦糖重點 / 鼠尾草綠 ──
+C={"ink":"#4A2E22","paper":"#F4EDE2","cara":"#E8C590","sage":"#7E9B86","mute":"#8C7B6B"}
+css=f"""
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{width:1080px;height:1350px;position:relative;overflow:hidden;background:{C['paper']};color:{C['ink']};font-family:'Noto Serif CJK TC'}}
+.grain{{position:absolute;inset:0;opacity:.35;mix-blend-mode:multiply;pointer-events:none}}
+.meta{{position:absolute;left:80px;top:80px;font-size:26px;letter-spacing:3px;color:{C['mute']}}}
+.pg{{position:absolute;right:80px;top:80px;font-size:26px;color:{C['mute']}}}
+.foot{{position:absolute;left:80px;right:80px;bottom:70px;display:flex;justify-content:space-between;font-size:26px;color:{C['mute']};letter-spacing:2px}}
+h1{{position:absolute;left:80px;right:80px;top:150px;font-weight:900;font-size:84px;line-height:1.3}}
+h1 em{{font-style:normal;background:linear-gradient(transparent 58%,{C['cara']} 58%)}}
+.sub{{position:absolute;left:80px;right:80px;top:390px;font-size:36px;line-height:1.6;color:{C['mute']}}}
+.dia{{position:absolute;left:80px;right:80px;top:500px;height:300px;display:flex;align-items:center;justify-content:center;gap:40px}}
+.grid{{position:absolute;left:80px;right:80px;top:830px;display:grid;grid-template-columns:1fr 1fr;gap:34px 50px}}
+.grid b{{display:block;font-size:40px;font-weight:900;margin-bottom:8px}}.grid span{{font-size:30px;color:{C['mute']};line-height:1.5}}
+.hl{{position:absolute;left:80px;right:80px;top:1085px;border-top:2px solid {C['ink']};padding-top:24px;font-size:34px}}
+.hl b{{background:linear-gradient(transparent 55%,{C['cara']} 55%);font-weight:900;font-size:38px}}
+.hl span{{display:block;color:{C['mute']};font-size:30px;margin-top:8px}}
+.cover{{background:{C['ink']};color:{C['paper']}}}
+.cover .meta,.cover .foot,.cover .pg{{color:{C['paper']};opacity:.7}}
+.cover h1{{top:420px;font-size:100px}}.cover h1 em{{background:none;color:{C['cara']}}}
+.cover .sub{{top:820px;color:{C['paper']};opacity:.85}}
+.cover .tag{{position:absolute;left:80px;top:330px;font-size:34px;letter-spacing:4px;color:{C['cara']}}}
+.sum h1{{top:420px;text-align:center;font-size:92px}}.sum .sub{{top:810px;text-align:center}}
+.cta h1{{top:380px;text-align:center}}.cta .sub{{top:620px;text-align:center;font-size:38px;color:{C['ink']}}}
+.cta .box{{position:absolute;left:180px;right:180px;top:900px;border:3px solid {C['ink']};padding:34px;text-align:center;font-size:40px;font-weight:900}}
+svg{{overflow:visible}}
+"""
+grain='<svg class=grain width="1080" height="1350"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2"/><feColorMatrix values="0 0 0 0 .3 0 0 0 0 .2 0 0 0 0 .15 0 0 0 .5 0"/></filter><rect width="100%" height="100%" filter="url(#n)"/></svg>'
+S=f'stroke="{C["ink"]}" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"'
+icons={
+
+"contract":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><rect x="80" y="30" width="180" height="200" rx="8"/><path d="M110 80h120M110 120h120M110 160h70"/><path d="M300 130h60" stroke-dasharray="10 10"/><path d="M390 60l40 40 80-80M390 150h120M390 190h80"/></g><text x="170" y="255" text-anchor="middle" font-size="26" fill="{C["mute"]}">合約帶回家</text><text x="450" y="255" text-anchor="middle" font-size="26" fill="{C["mute"]}">逐條看過</text></svg>',
+"money":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><rect x="60" y="150" width="140" height="60" rx="6"/><rect x="75" y="110" width="140" height="60" rx="6"/><rect x="90" y="70" width="140" height="60" rx="6"/><path d="M300 190h60" stroke-dasharray="10 10"/><rect x="400" y="40" width="110" height="60" rx="6"/><rect x="400" y="110" width="110" height="60" rx="6"/><rect x="400" y="180" width="110" height="40" rx="6"/></g><text x="150" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">加盟金</text><text x="455" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">裝潢・設備・進貨</text></svg>',
+"store":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><path d="M60 110l30-60h160l30 60zM70 110v110h190V110M120 220v-70h60v70"/><path d="M330 110l30-60h160l30 60zM340 110v110h190V110M390 220v-70h60v70"/><path d="M290 160h20" stroke-dasharray="8 8"/></g><text x="170" y="255" text-anchor="middle" font-size="26" fill="{C["mute"]}">總部帶你看的</text><text x="440" y="255" text-anchor="middle" font-size="26" fill="{C["mute"]}">自己平日去的</text></svg>',
+"question":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><rect x="60" y="40" width="200" height="130" rx="20"/><path d="M100 170l-20 40 60-40"/><path d="M140 80c0-15 15-25 30-20s15 25 0 30v12M170 125v6"/><rect x="320" y="60" width="180" height="150" rx="8"/><path d="M350 100h120M350 135h120M350 170h70"/></g><text x="160" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">帶著問題去</text><text x="410" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">寫下來</text></svg>',
+"coupon":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><path d="M60 70h200v40a20 20 0 0 0 0 40v40H60v-40a20 20 0 0 0 0-40z"/><path d="M160 80v100" stroke-dasharray="10 10"/><path d="M300 130h60" stroke-dasharray="10 10"/><path d="M400 200V60M400 200h120M420 180l30-50 30 20 30-70"/></g><text x="160" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">優惠券</text><text x="460" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">扣掉折扣後的毛利</text></svg>',
+"calc":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><rect x="80" y="40" width="160" height="190" rx="10"/><rect x="100" y="60" width="120" height="40"/><path d="M110 130h20M150 130h20M190 130h20M110 170h20M150 170h20M190 170h20M110 210h20M150 210h20"/><path d="M300 130h60" stroke-dasharray="10 10"/><path d="M400 60h120v160H400zM400 140h120M460 60v160"/></g><text x="160" y="255" text-anchor="middle" font-size="26" fill="{C["mute"]}">售價－成本－平台費</text><text x="460" y="255" text-anchor="middle" font-size="26" fill="{C["mute"]}">剩下才是能折的</text></svg>',
+"threshold":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><path d="M60 200h440"/><rect x="100" y="120" width="60" height="80"/><rect x="200" y="90" width="60" height="110"/><rect x="300" y="100" width="60" height="100"/><path d="M60 80h440" stroke-dasharray="12 10" stroke="{C["sage"]}"/><rect x="420" y="40" width="60" height="160" fill="{C["cara"]}" stroke="{C["ink"]}"/></g><text x="230" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">平均客單 500</text><text x="450" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">門檻設 600</text></svg>',
+"two":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><circle cx="150" cy="110" r="60"/><path d="M130 110h40M150 90v40"/><circle cx="410" cy="110" r="60"/><path d="M385 110l15 15 35-35"/></g><text x="150" y="220" text-anchor="middle" font-size="26" fill="{C["mute"]}">新客券：拉第一單</text><text x="410" y="220" text-anchor="middle" font-size="26" fill="{C["mute"]}">回購券：給買過的人</text></svg>',
+"review":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><path d="M80 200V50M80 200h200"/><path d="M100 170l40-40 40 20 40-60 40 30"/><circle cx="420" cy="120" r="60"/><path d="M420 80v40l30 20"/></g><text x="180" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">活動後回頭看</text><text x="420" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">有賺才繼續發</text></svg>',
+"roof":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><path d="M60 120l100-80 100 80M80 110v110h160V110"/><path d="M160 60v80" stroke-dasharray="6 8"/><path d="M165 150c0 15-10 20-10 30a10 10 0 0 0 20 0c0-10-10-15-10-30z"/><rect x="340" y="40" width="160" height="180" rx="8"/><path d="M370 80h100M370 115h100M370 150h60"/></g><text x="160" y="255" text-anchor="middle" font-size="26" fill="{C["mute"]}">漏水誰修？</text><text x="420" y="255" text-anchor="middle" font-size="26" fill="{C["mute"]}">寫進租約</text></svg>',
+"life":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><path d="M60 200h440"/><rect x="100" y="150" width="80" height="50"/><text x="140" y="135" text-anchor="middle" font-size="24" fill="{C["ink"]}">打平</text><rect x="240" y="100" width="80" height="100"/><text x="280" y="85" text-anchor="middle" font-size="24" fill="{C["ink"]}">撐得起生活</text><circle cx="440" cy="110" r="22"/><path d="M410 200c0-40 15-60 30-60s30 20 30 60"/><circle cx="490" cy="140" r="14"/><path d="M472 200c0-25 9-38 18-38s18 13 18 38"/></g><text x="280" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">要賺多少，才撐得起你的家</text></svg>',
+"heart":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><path d="M160 200c-60-40-100-80-100-120a40 40 0 0 1 80-10 40 40 0 0 1 80 10c0 40-40 80-60 120z"/><path d="M300 130h60" stroke-dasharray="10 10"/><circle cx="440" cy="120" r="70"/><path d="M410 120l20 20 40-40"/></g><text x="160" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">當場心動</text><text x="440" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">回家冷靜</text></svg>',
+"seed":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><path d="M160 210V120M160 150c-40 0-60-30-60-60 30 0 60 20 60 60zM160 120c40 0 60-30 60-60-30 0-60 20-60 60z"/><path d="M100 210h120"/><path d="M300 130h60" stroke-dasharray="10 10"/><rect x="400" y="50" width="120" height="160" rx="8"/><path d="M420 90l12 12 24-24M420 130l12 12 24-24M420 170l12 12 24-24M470 85h30M470 125h30M470 165h30"/></g><text x="160" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">收過的店</text><text x="460" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">變成現在的提醒</text></svg>',
+"crowd":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><circle cx="90" cy="70" r="34"/><path d="M30 200c0-50 30-80 60-80s60 30 60 80"/><circle cx="280" cy="70" r="34"/><path d="M220 200c0-50 30-80 60-80s60 30 60 80"/><circle cx="470" cy="70" r="34"/><path d="M410 200c0-50 30-80 60-80s60 30 60 80"/></g><text x="90" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">觀光客</text><text x="280" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">社區家庭</text><text x="470" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">文青客</text></svg>',
+"box":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><rect x="60" y="80" width="200" height="140" rx="6"/><path d="M60 80l40-50h120l40 50M160 80v140"/><rect x="340" y="140" width="110" height="80" rx="6"/><path d="M340 140l22-28h66l22 28"/><path d="M290 150h30" stroke-dasharray="10 10"/></g><text x="160" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">主力 1～2 款</text><text x="395" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">入門小份</text></svg>',
+"cash":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><circle cx="110" cy="130" r="60"/><circle cx="110" cy="130" r="30"/><rect x="250" y="60" width="140" height="140" rx="10"/><path d="M275 85h30v30h-30zM335 85h30v30h-30zM275 145h30v30h-30zM335 145h12M355 165h10"/><path d="M450 70v120M430 100h40M430 160h40"/></g><text x="110" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">零錢</text><text x="320" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">QR 碼立牌</text><text x="450" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">整數價</text></svg>',
+"sign":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><rect x="60" y="40" width="220" height="110" rx="8"/><path d="M170 150v70M120 220h100"/><path d="M90 80h160M90 110h100"/><rect x="340" y="150" width="60" height="60"/><rect x="410" y="110" width="60" height="100"/><rect x="480" y="70" width="60" height="140"/></g><text x="170" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">遠遠看得到</text><text x="440" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">高低差陳列</text></svg>',
+"rain":f'<svg width="560" height="260" viewBox="0 0 560 260"><g {S}><path d="M40 120a100 100 0 0 1 200 0zM140 120v80a20 20 0 0 1-40 0"/><path d="M300 90h120v60H300zM420 110h30v20h-30M330 150v40M390 150v40"/><circle cx="500" cy="100" r="22"/><path d="M470 200c0-40 15-60 30-60s30 20 30 60"/></g><text x="140" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">雨備</text><text x="360" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">延長線</text><text x="500" y="250" text-anchor="middle" font-size="26" fill="{C["mute"]}">換手的人</text></svg>',
+}
+def page(p,i,n):
+    k=p["kind"]; foot=f'<div class=foot><span>@sunny_lin67</span><span>{i:02d} / {n:02d}</span></div>'
+    if k=="cover":
+        return f'<body class=cover>{grain}<div class=meta>{p["meta"]}</div><div class=tag>{p["tag"]}</div><h1>{p["h"]}</h1><div class=sub>{p["sub"]}</div>{foot}</body>'
+    if k=="sec":
+        g="".join(f'<div><b>{a}</b><span>{b}</span></div>' for a,b in p["grid"])
+        return f'<body>{grain}<div class=meta>{p["meta"]}</div><div class=pg>{i}/{n}</div><h1>{p["h"]}</h1><div class=sub>{p["sub"]}</div><div class=dia>{icons.get(p.get("icon"),"")}</div><div class=grid>{g}</div><div class=hl><b>{p["hl"]}</b><span>{p["hl2"]}</span></div>{foot}</body>'
+    if k=="sum":
+        return f'<body class=sum>{grain}<div class=meta>{p["meta"]}</div><div class=pg>{i}/{n}</div><h1>{p["h"]}</h1><div class=sub>{p["sub"]}</div>{foot}</body>'
+    return f'<body class=cta>{grain}<div class=meta>{p["meta"]}</div><div class=pg>{i}/{n}</div><h1>{p["h"]}</h1><div class=sub>{p["sub"]}</div><div class=box>{p["box"]}</div>{foot}</body>'
+async def main(spec,out):
+    pages=json.load(open(spec)); n=len(pages); os.makedirs(out,exist_ok=True)
+    async with async_playwright() as pw:
+        b=await pw.chromium.launch(); pg=await b.new_page(viewport={'width':1080,'height':1350})
+        for i,p in enumerate(pages,1):
+            await pg.set_content(f"<html><head><meta charset=utf-8><style>{css}</style></head>{page(p,i,n)}</html>"); await pg.wait_for_timeout(200)
+            await pg.screenshot(path=f"{out}/p{i:02d}.jpg",type="jpeg",quality=92)
+        await b.close()
+    ims=[Image.open(f"{out}/p{i:02d}.jpg").resize((270,338)) for i in range(1,n+1)]
+    s=Image.new('RGB',(270*4,338*((n+3)//4)),'white')
+    for k,im in enumerate(ims): s.paste(im,((k%4)*270,(k//4)*338))
+    s.save(f"{out}-preview.jpg",quality=88)
+asyncio.run(main(sys.argv[1],sys.argv[2]))
